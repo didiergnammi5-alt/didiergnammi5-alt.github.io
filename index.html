@@ -32,6 +32,8 @@
   button:active{transform:translateY(3px);box-shadow:0 1px 0 #a86a00}
   button.alt{background:#2b6cff;color:#fff;box-shadow:0 4px 0 #1741a0}
   button:focus-visible{outline:3px solid #fff;outline-offset:2px}
+  #foot{flex:0 0 auto;display:flex;gap:18px;justify-content:center;padding:6px 8px calc(6px + env(safe-area-inset-bottom,0));background:#0c0f14;width:100%;font-size:12px}
+  #foot a{color:#9aa4b5;text-decoration:none;padding:4px 2px}
   #msg{min-height:20px;font-size:14px;color:var(--danger)}
 </style>
 </head>
@@ -46,6 +48,7 @@
     <canvas id="c" width="360" height="640"></canvas>
     <div id="ov"></div>
   </div>
+  <nav id="foot"><a href="a-propos.html">À propos</a><a href="confidentialite.html">Confidentialité</a><a href="contact.html">Contact</a></nav>
 </div>
 
 <script>
