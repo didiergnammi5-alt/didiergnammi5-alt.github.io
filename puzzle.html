@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Bloc Éclair – Puzzle de blocs gratuit</title>
+<meta name="description" content="Posez les blocs sur la grille, complétez des lignes et battez votre record. Jeu de puzzle gratuit, sans inscription.">
+
+<!-- AdSense : votre ID éditeur est déjà renseigné. Retirez data-adbreak-test="on" après approbation H5 Games Ads. -->
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5566975462377270"
+        data-ad-client="ca-pub-5566975462377270" data-adbreak-test="on" crossorigin="anonymous"></script>
+<script>
+  window.adsbygoogle = window.adsbygoogle || [];
+  window.adBreak = window.adConfig = function (o) { adsbygoogle.push(o); };
+  adConfig({ preloadAdBreaks: 'on', sound: 'on' });
+</script>
+
+<style>
+  :root{--bg:#14181f;--accent:#ffb020;--ink:#f2f4f8}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:"Trebuchet MS","Segoe UI",sans-serif;overflow:hidden;touch-action:none;user-select:none}
+  #app{display:flex;flex-direction:column;align-items:center;height:100%;padding-top:env(safe-area-inset-top,0)}
+  #banner{flex:0 0 52px;display:flex;align-items:center;justify-content:center;width:100%;background:#0c0f14}
+  #stage{position:relative;flex:1;width:100%;min-height:0;display:flex;justify-content:center;align-items:center}
+  canvas{height:100%;max-width:100%;aspect-ratio:360/600;touch-action:none}
+  #ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;background:rgba(10,12,16,.85)}
+  #ov[hidden]{display:none}
+  #ov h1{margin:0;font-size:clamp(30px,8vw,42px);line-height:1.05;color:var(--accent);text-shadow:0 3px 0 #7a4a00}
+  #ov p{margin:0;max-width:300px;font-size:16px;line-height:1.45;color:#cfd5e0}
+  button{font:inherit;font-weight:700;font-size:18px;padding:13px 26px;min-width:230px;border:0;border-radius:14px;background:var(--accent);color:#2a1a00;box-shadow:0 4px 0 #a86a00;cursor:pointer}
+  button:active{transform:translateY(3px);box-shadow:0 1px 0 #a86a00}
+  button.alt{background:#2b6cff;color:#fff;box-shadow:0 4px 0 #1741a0}
+  button:focus-visible{outline:3px solid #fff;outline-offset:2px}
+  #foot{flex:0 0 auto;display:flex;gap:18px;justify-content:center;width:100%;padding:6px 8px calc(6px + env(safe-area-inset-bottom,0));background:#0c0f14;font-size:12px}
+  #foot a{color:#9aa4b5;text-decoration:none;padding:4px 2px}
+  #msg{min-height:20px;font-size:14px;color:#e5484d}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="banner">
+    <ins class="adsbygoogle" style="display:inline-block;width:320px;height:50px"
+         data-ad-client="ca-pub-5566975462377270" data-ad-slot="7815596511"></ins>
+  </div>
+  <div id="stage">
+    <canvas id="c" width="360" height="600"></canvas>
+    <div id="ov"></div>
+  </div>
+  <nav id="foot"><a href="index.html">Dernier Rempart</a><a href="a-propos.html">À propos</a><a href="confidentialite.html">Confidentialité</a><a href="contact.html">Contact</a></nav>
+</div>
+
+<script>
+try { (adsbygoogle = window.adsbygoogle || []).push({}); } catch (e) {}
+
+const cv = document.getElementById('c'), ctx = cv.getContext('2d'), ov = document.getElementById('ov');
+const W = 360, H = 600, C = 40, N = 8, BX = 20, BY = 90, TY = 450;
+const PAL = ['', '#e5484d', '#ffb020', '#3ecf8e', '#2b6cff', '#a855f7', '#22d3ee'];
+const LIST = ['X','XX','XXX','XXXX','XXXXX','X/X','X/X/X','X/X/X/X','X/X/X/X/X','XX/XX','XXX/XXX/XXX','XXX/XXX','XX/XX/XX',
+  'XX/X.','XX/.X','X./XX','.X/XX','X../X../XXX','XXX/X../X..','XXX/..X/..X','..X/..X/XXX','XXX/.X.','.X./XXX','.XX/XX.','XX/.XX'];
+const SH = LIST.map(s => { const rows = s.split('/'), cells = [];
+  rows.forEach((r, i) => [...r].forEach((ch, j) => ch === 'X' && cells.push([i, j])));
+  return { cells, h: rows.length, w: rows[0].length }; });
+const ri = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
+
+let grid, tray, score = 0, best = 0, drag = null, ps = [], over = true, used = false, adBusy = false, msg = '', msgT = 0;
+try { best = +localStorage.getItem('bloc_best') || 0; } catch (e) {}
+
+/* ---------- Pubs ---------- */
+function ad(type, name, onDone, onReward) {
+  if (adBusy) return; adBusy = true;
+  let done = false;
+  const finish = ok => { if (done) return; done = true; adBusy = false; onDone(ok); };
+  const timer = setTimeout(() => finish(false), 2500);
+  const o = { type, name, afterAd() { clearTimeout(timer); }, adBreakDone(i) { clearTimeout(timer); finish(i && i.breakStatus === 'viewed'); } };
+  if (type === 'reward') { o.beforeReward = show => { clearTimeout(timer); show(); }; o.adViewed = () => onReward && onReward(); }
+  adBreak(o);
+}
+
+/* ---------- Écrans ---------- */
+function screen(title, text, btns, m) {
+  ov.hidden = false; ov.innerHTML = `<h1>${title}</h1><p>${text}</p><div id="msg">${m || ''}</div>`;
+  btns.forEach(([l, cls, fn]) => { const b = document.createElement('button'); b.textContent = l; if (cls) b.className = cls; b.onclick = fn; ov.appendChild(b); });
+}
+function menu() { screen('Bloc Éclair', 'Glissez les blocs sur la grille. Complétez des lignes ou des colonnes pour les faire disparaître. Quand plus rien ne rentre, la partie est finie !', [['Jouer', '', newGame]]); }
+function end() {
+  over = true;
+  if (score > best) { best = score; try { localStorage.setItem('bloc_best', best); } catch (e) {} }
+  const btns = [];
+  if (!used) btns.push(['Continuer (vidéo)', 'alt', () => ad('reward', 'continue', ok => {
+    if (ok) { used = true; for (let i = 3; i < 5; i++) for (let k = 0; k < N; k++) { grid[i][k] = 0; grid[k][i] = 0; } deal(); over = false; ov.hidden = true; }
+    else end2('Pub indisponible pour le moment.');
+  }, null)]);
+  btns.push(['Rejouer', '', () => ad('next', 'retry', () => newGame())]);
+  screen('Partie terminée', `Score : ${score} · Record : ${best}`, btns);
+}
+function end2(m) { screen('Partie terminée', `Score : ${score} · Record : ${best}`, [['Rejouer', '', () => ad('next', 'retry2', () => newGame())]], m); }
+
+/* ---------- Jeu ---------- */
+function mk() { const s = SH[ri(0, SH.length - 1)]; return { cells: s.cells, w: s.w, h: s.h, col: ri(1, 6) }; }
+function fits(p, gx, gy) { return p.cells.every(([r, c]) => { const y = gy + r, x = gx + c; return y >= 0 && y < N && x >= 0 && x < N && !grid[y][x]; }); }
+function can(p) { for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (fits(p, x, y)) return true; return false; }
+function deal() { for (let t = 0; t < 30; t++) { tray = [mk(), mk(), mk()]; if (tray.some(can)) return; } }
+function newGame() { grid = Array.from({ length: N }, () => Array(N).fill(0)); score = 0; used = false; over = false; drag = null; deal(); ov.hidden = true; }
+
+function boom(x, y, c) { for (let i = 0; i < 4; i++) ps.push({ x, y, vx: (Math.random() - .5) * 200, vy: (Math.random() - .5) * 200, l: .5, c }); }
+function place(p, gx, gy) {
+  p.cells.forEach(([r, c]) => grid[gy + r][gx + c] = p.col);
+  let gain = p.cells.length;
+  const rows = [], cols = [];
+  for (let i = 0; i < N; i++) { if (grid[i].every(v => v)) rows.push(i); if (grid.every(r => r[i])) cols.push(i); }
+  const clr = new Set();
+  rows.forEach(r => { for (let k = 0; k < N; k++) clr.add(r * N + k); });
+  cols.forEach(c => { for (let k = 0; k < N; k++) clr.add(k * N + c); });
+  clr.forEach(v => { const y = (v / N) | 0, x = v % N; boom(BX + x * C + C / 2, BY + y * C + C / 2, PAL[grid[y][x]]); });
+  clr.forEach(v => grid[(v / N) | 0][v % N] = 0);
+  const n = rows.length + cols.length;
+  if (n) { gain += n * n * 10; msg = n > 1 ? `Combo ×${n} !` : 'Bien joué !'; msgT = 1; }
+  score += gain;
+}
+
+/* ---------- Dessin ---------- */
+function cell(x, y, s, col, a = 1) {
+  ctx.globalAlpha = a; ctx.fillStyle = col; ctx.beginPath(); ctx.roundRect(x + 1, y + 1, s - 2, s - 2, s * .18); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.beginPath(); ctx.roundRect(x + 3, y + 3, s - 6, s * .3, s * .12); ctx.fill(); ctx.globalAlpha = 1;
+}
+function slotInfo(i) { const p = tray[i]; if (!p) return null; const s = Math.min(26, 104 / Math.max(p.w, p.h)); return { s, x: i * 120 + 60 - p.w * s / 2, y: TY + 60 - p.h * s / 2 }; }
+function dragPos() { const p = tray[drag.i], x = drag.x - p.w * C / 2, y = drag.y - 80 - p.h * C / 2; return { x, y, gx: Math.round((x - BX) / C), gy: Math.round((y - BY) / C) }; }
+let last = performance.now();
+function draw(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  ctx.fillStyle = '#14181f'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle';
+  ctx.font = 'bold 14px Trebuchet MS'; ctx.textAlign = 'left'; ctx.fillStyle = '#9aa4b5'; ctx.fillText('SCORE', 20, 24); ctx.textAlign = 'right'; ctx.fillText('RECORD', W - 20, 24);
+  ctx.font = 'bold 30px Trebuchet MS'; ctx.fillStyle = '#ffb020'; ctx.textAlign = 'left'; ctx.fillText(score, 20, 56); ctx.textAlign = 'right'; ctx.fillStyle = '#fff'; ctx.fillText(best, W - 20, 56);
+  if (msgT > 0) { msgT -= dt; ctx.globalAlpha = Math.min(1, msgT * 2); ctx.textAlign = 'center'; ctx.fillStyle = '#3ecf8e'; ctx.font = 'bold 22px Trebuchet MS'; ctx.fillText(msg, W / 2, 56); ctx.globalAlpha = 1; }
+  ctx.fillStyle = '#1f2633'; ctx.beginPath(); ctx.roundRect(BX - 6, BY - 6, N * C + 12, N * C + 12, 14); ctx.fill();
+  if (grid) {
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (grid[y][x]) cell(BX + x * C, BY + y * C, C, PAL[grid[y][x]]);
+      else { ctx.fillStyle = '#2a3242'; ctx.beginPath(); ctx.roundRect(BX + x * C + 2, BY + y * C + 2, C - 4, C - 4, 6); ctx.fill(); }
+    }
+    if (drag) { const p = tray[drag.i], d = dragPos();
+      if (fits(p, d.gx, d.gy)) p.cells.forEach(([r, c]) => cell(BX + (d.gx + c) * C, BY + (d.gy + r) * C, C, PAL[p.col], .35)); }
+    for (let i = 0; i < 3; i++) { const p = tray[i], si = slotInfo(i); if (!p || (drag && drag.i === i)) continue;
+      const ok = can(p); p.cells.forEach(([r, c]) => cell(si.x + c * si.s, si.y + r * si.s, si.s, ok ? PAL[p.col] : '#555', ok ? 1 : .6)); }
+    if (drag) { const p = tray[drag.i], d = dragPos(); p.cells.forEach(([r, c]) => cell(d.x + c * C, d.y + r * C, C, PAL[p.col])); }
+  }
+  ps.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.l -= dt; ctx.globalAlpha = Math.max(0, p.l * 2); ctx.fillStyle = p.c; ctx.fillRect(p.x, p.y, 6, 6); });
+  ctx.globalAlpha = 1; ps = ps.filter(p => p.l > 0);
+  requestAnimationFrame(draw);
+}
+
+/* ---------- Contrôles ---------- */
+function pt(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H }; }
+cv.addEventListener('pointerdown', e => {
+  if (over || !tray) return; const q = pt(e);
+  if (q.y < TY - 20) return;
+  const i = Math.max(0, Math.min(2, Math.floor(q.x / 120)));
+  if (tray[i] && can(tray[i])) { drag = { i, x: q.x, y: q.y }; cv.setPointerCapture(e.pointerId); }
+});
+cv.addEventListener('pointermove', e => { if (drag) { const q = pt(e); drag.x = q.x; drag.y = q.y; } });
+function drop() {
+  if (!drag) return; const p = tray[drag.i], d = dragPos();
+  if (fits(p, d.gx, d.gy)) {
+    place(p, d.gx, d.gy); tray[drag.i] = null;
+    if (tray.every(v => !v)) deal();
+    drag = null;
+    if (!tray.some(v => v && can(v))) setTimeout(end, 500);
+  } else drag = null;
+}
+cv.addEventListener('pointerup', drop);
+cv.addEventListener('pointercancel', () => { drag = null; });
+
+menu(); requestAnimationFrame(draw);
+</script>
+</body>
+</html>
